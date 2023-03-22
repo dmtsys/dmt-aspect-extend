@@ -110,7 +110,7 @@ function importComplex(appEntryFilePath) {
     // quite simple loading procedure but seems convoluted because of all error handling
     // and especially because mid init function can be async
     // and we have to distinguish these two cases (async and normal init function) for proper error handling
-    import(appEntryFilePath)
+    import(appEntryFilePath + `?${Math.random()}`)
       .then(mod => {
         let promiseOrData;
         let isPromise;
