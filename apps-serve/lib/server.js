@@ -1,6 +1,10 @@
 import { log, colors, determineGUIPort } from 'dmt/common';
 
 import express from 'express';
+import fs from 'fs';
+
+import loadApps from '../../apps-load/loadApps.js'
+
 import ssrProxy from './ssrProxy.js'
 
 const ssrMiddlewares = new Map();
@@ -15,30 +19,30 @@ class Server {
     expressAppSetup(this.app);
   }
 
-  useDynamicSSR(route, callback, reload = false) {
+  useDynamicSSR(appName, callback, reload = false) {
     if (typeof callback != "function") return;
-    const hasMiddleware = !!ssrMiddlewares.get(route);
-    ssrMiddlewares.set(route, callback);
+    const hasMiddleware = !!ssrMiddlewares.get(appName);
+    ssrMiddlewares.set(appName, callback);
 
     // what do you think of program.emit code below
     if (reload & !hasMiddleware) {
       log.green('dmt new ssr app: ' + appName);
-      // this.program.emit('new_ssr_app', route);
+      // this.program.emit('new_ssr_app', appName);
     } else if (reload) {
       log.green('dmt ssr app reload: ' + appName);
-      // this.program.emit('reload_ssr_app', route);
+      // this.program.emit('reload_ssr_app', appName);
     }
 
     if (hasMiddleware) return;
 
-    this.app.use(`/_${route}`, function (req, res, next) {
-      const callback = ssrMiddlewares.get(route);
+    this.app.use(`/_${appName}`, function (req, res, next) {
+      const callback = ssrMiddlewares.get(appName);
       if (callback) {
         return callback(req, res, next);
       }
       next();
     })
-      .use(route, ssrProxy(route));
+      .use(`/${appName}`, ssrProxy(appName));
   }
 
   listen() {
@@ -66,7 +70,11 @@ class Server {
           log.red(err.message || err);
           res.end('rejected');
         })
+      } else {
+        log.red("__dmt__reload appdir do not exist: " + appDir);
+        res.end('rejected');
       }
+
     })
       .listen(port, () => {
         //log.green('%s listening at http://%s:%s', description || 'Server', 'localhost', port);

@@ -16,7 +16,7 @@ function mountApps(appDefinitions, server) {
 
     for (const [appName, { expressAppSetup, ssrHandler }] of Object.entries(appDefinitions)) {
       if (ssrHandler) {
-        server.useDynamicSSR(`/_${appName}`, ssrHandler);
+        server.useDynamicSSR(appName, ssrHandler);
         ssrApps.push(appName);
         // } else if (initData?.express) {
         //   // TODO: reconsider
