@@ -2,6 +2,7 @@ import { log, colors, determineGUIPort } from 'dmt/common';
 
 import express from 'express';
 
+const ssrMiddlewares = new Map();
 class Server {
   constructor(program) {
     this.program = program;

@@ -1,11 +1,9 @@
 import express from 'express';
 
-import { log } from 'dmt/common';
 import { contentServer } from 'dmt/connectome-next';
 import { appFrontendList } from 'dmt/apps-load';
 
 import Server from './lib/server.js';
-import ssrProxy from './lib/ssrProxy.js';
 import setupRedirects from './lib/setupRedirects.js';
 
 function mountApps(appDefinitions, server) {
