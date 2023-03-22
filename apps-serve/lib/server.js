@@ -1,6 +1,7 @@
 import { log, colors, determineGUIPort } from 'dmt/common';
 
 import express from 'express';
+import ssrProxy from './ssrProxy.js'
 
 const ssrMiddlewares = new Map();
 class Server {
