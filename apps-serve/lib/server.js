@@ -37,7 +37,7 @@ class Server {
       }
       next();
     })
-    app.use(route, ssrProxy(route));
+      .use(route, ssrProxy(route));
   }
 
   listen() {
