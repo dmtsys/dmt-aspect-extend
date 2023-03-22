@@ -13,6 +13,32 @@ class Server {
     expressAppSetup(this.app);
   }
 
+  useDynamicSSR(route, callback, reload = false) {
+    if (typeof callback != "function") return;
+    const hasMiddleware = !!ssrMiddlewares.get(route);
+    ssrMiddlewares.set(route, callback);
+
+    // what do you think of program.emit code below
+    if (reload & !hasMiddleware) {
+      log.green('dmt new ssr app: ' + appName);
+      // this.program.emit('new_ssr_app', route);
+    } else if (reload) {
+      log.green('dmt ssr app reload: ' + appName);
+      // this.program.emit('reload_ssr_app', route);
+    }
+
+    if (hasMiddleware) return;
+
+    this.app.use(`/_${route}`, function (req, res, next) {
+      const callback = ssrMiddlewares.get(route);
+      if (callback) {
+        return callback(req, res, next);
+      }
+      next();
+    })
+    app.use(route, ssrProxy(route));
+  }
+
   listen() {
     //const name = 'dmt-server';
     //const description = '🌐 DMT-SERVER';
@@ -23,7 +49,23 @@ class Server {
       throw new Error('Gui port is not properly specified! Please specify in services.def');
     }
 
-    this.app
+    this.app.get('/__dmt__reload', (req, res) => {
+      const appDir = req.query.app;
+      if (fs.existsSync(appDir)) {
+        loadApps([{ appDir }]).then(appDefinations => {
+          for (const appName in appDefinations) {
+            const ssrHandler = appDefinations[appName]?.ssrHandler;
+            if (ssrHandler) {
+              this.useDynamicSSR(appName, ssrHandler, true);
+            }
+          }
+          res.end('success');
+        }).catch((err) => {
+          log.red(err.message || err);
+          res.end('rejected');
+        })
+      }
+    })
       .listen(port, () => {
         //log.green('%s listening at http://%s:%s', description || 'Server', 'localhost', port);
 
