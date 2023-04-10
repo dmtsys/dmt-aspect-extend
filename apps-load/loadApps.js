@@ -80,7 +80,8 @@ export default function loadApps(appList) {
 // }
 
 async function tryLoadApp(appEntryFilePath, appName) {
-  log.cyan(`Loading ${colors.magenta(appName)} app`);
+  // todo: also show icons for isDeviceApp, isUserApp here
+  log.white(`🤖 Loading ${colors.magenta(appName)} subprogram`);
 
   return new Promise((success, reject) => {
     loadApp(appEntryFilePath)
