@@ -2,7 +2,7 @@ import express from 'express';
 
 import { log, colors } from 'dmt/common';
 
-import { contentServer } from 'connectome-next';
+import { contentServer } from 'dmt/connectome-next';
 import { appFrontendList } from 'dmt/apps-load';
 
 import Server from './lib/server.js';
@@ -27,7 +27,7 @@ function mountApps(appDefinitions, server) {
     const ssrApps = [];
 
     // todo: also show icons for isDeviceApp, isUserApp here
-    for (const [appName, { expressAppSetup, ssrHandler }] of Object.entries(appDefinitions)) {
+    for (const { appName, expressAppSetup, ssrHandler } of appDefinitions) {
       if (ssrHandler) {
         server.useDynamicSSR(appName, ssrHandler);
         ssrApps.push(appName);

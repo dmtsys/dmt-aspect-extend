@@ -4,61 +4,55 @@ import stripAnsi from 'strip-ansi';
 
 import { log, colors, program } from 'dmt/common';
 
-export default function loadApps(appList) {
+export function loadApps(appList) {
   const promises = [];
   const appNames = [];
+  const appDirs = [];
+  const appEntries = [];
 
   appList.forEach(({ appDir }) => {
     const appEntryFilePath = path.join(appDir, 'index.js');
-    const appEntryFilePathHook = path.join(appDir, 'dmt/index.js');
-    //const ssrHandlerFilePath = path.join(appDir, 'handler.js');
+    const appEntrySubprogram = path.join(appDir, 'dmt/index.js');
 
-    //if (fs.existsSync(appEntryFilePath) || fs.existsSync(appEntryFilePathHook) || fs.existsSync(ssrHandlerFilePath)) {
-    if (fs.existsSync(appEntryFilePath) || fs.existsSync(appEntryFilePathHook)) {
+    if (fs.existsSync(appEntryFilePath) || fs.existsSync(appEntrySubprogram)) {
       const appName = path.basename(appDir);
 
       if (fs.existsSync(appEntryFilePath)) {
         appNames.push(appName);
+        appDirs.push(appDir);
+        appEntries.push(appEntryFilePath);
         promises.push(tryLoadApp(appEntryFilePath, appName));
       }
 
-      //console.log(appEntryFilePathHook);
-
-      if (fs.existsSync(appEntryFilePathHook)) {
+      if (fs.existsSync(appEntrySubprogram)) {
         appNames.push(appName);
-        promises.push(tryLoadApp(appEntryFilePathHook, appName));
+        appDirs.push(appDir);
+        appEntries.push(appEntrySubprogram);
+        promises.push(tryLoadApp(appEntrySubprogram, appName));
       }
-
-      // if (fs.existsSync(ssrHandlerFilePath)) {
-      //   appNames.push(appName);
-      //   promises.push(tryLoadSSRHandler(ssrHandlerFilePath, appName));
-      // }
     }
   });
 
   return new Promise((success, reject) => {
-    const appDefinitions = {};
+    const appDefinitions = [];
 
     Promise.all(promises).then(returnObjects => {
       returnObjects.forEach((result, i) => {
         if (result) {
           const appName = appNames[i];
-          appDefinitions[appName] = appDefinitions[appName] || {};
+          const appDir = appDirs[i];
+          const appEntry = appEntries[i];
 
-          if (result.handler) {
-            appDefinitions[appName].ssrHandler = result.handler;
+          const { handler, expressAppSetup } = result;
+
+          let hasSSRHandler = false;
+
+          if (handler) {
+            hasSSRHandler = true;
           }
 
-          // if (result.initData) {
-          //   appDefinitions[appName].initData = result.initData;
-          // }
-          if (result.expressAppSetup) {
-            appDefinitions[appName].expressAppSetup = result.expressAppSetup;
-          }
+          appDefinitions.push({ appName, appDir, appEntry, hasSSRHandler, ssrHandler: handler, expressAppSetup });
         }
-
-        //return appDefinitions;
-        //return { appName: appNames[i], initData: result.initData, server: result.server };
       });
 
       success(appDefinitions);
@@ -106,12 +100,12 @@ async function loadApp(appEntryFilePath) {
   });
 }
 
-function importComplex(appEntryFilePath) {
+export function importComplex(appEntryFilePath) {
   return new Promise((success, reject) => {
     // quite simple loading procedure but seems convoluted because of all error handling
     // and especially because mid init function can be async
     // and we have to distinguish these two cases (async and normal init function) for proper error handling
-    import(appEntryFilePath + `?${Math.random()}`)
+    import(`${appEntryFilePath}?${Math.random()}`) // ⚠️ do we still need this random here??? probably not
       .then(mod => {
         let promiseOrData;
         let isPromise;

@@ -3,9 +3,10 @@ import { log, colors, determineGUIPort } from 'dmt/common';
 import express from 'express';
 import fs from 'fs';
 
-import loadApps from '../../apps-load/loadApps.js'
+//import loadApps from '../../apps-load/loadApps.js';
+import { reloadSSRHandler, reloadAllSSRHandlers } from '../../apps-load/index.js';
 
-import ssrProxy from './ssrProxy.js'
+import ssrProxy from './ssrProxy.js';
 
 const ssrMiddlewares = new Map();
 class Server {
@@ -13,35 +14,52 @@ class Server {
     this.program = program;
 
     this.app = express();
+
+    // ⚠️
+    // program gui reload event (happens on "dmt copy" for example)
+    // it reloads all SSR handlers
+    // next possible update: only reload those handlers that changed (symlink is different)
+    // save built_target did in initial load into _initialAppDefinitions
+    // this update is not critical for now....
+    program.on('gui:reload', () => {
+      log.yellow('Gui reload event received — reloading all ssr handlers');
+      reloadAllSSRHandlers({ server: this }).catch(e => {
+        log.red('Error reloading some ssr handlers, should have received individual notifications and log entries');
+        log.red(e);
+        // let the program continue
+      });
+    });
   }
 
   setupRoutes(expressAppSetup) {
     expressAppSetup(this.app);
   }
 
+  // reload option is not really used now
   useDynamicSSR(appName, callback, reload = false) {
-    if (typeof callback != "function") return;
+    if (typeof callback != 'function') return;
     const hasMiddleware = !!ssrMiddlewares.get(appName);
     ssrMiddlewares.set(appName, callback);
 
     // what do you think of program.emit code below
-    if (reload & !hasMiddleware) {
-      log.green('dmt new ssr app: ' + appName);
+    if (reload && !hasMiddleware) {
+      log.green(`💡 New SSR handler loaded: ${colors.magenta(appName)}`);
       // this.program.emit('new_ssr_app', appName);
     } else if (reload) {
-      log.green('dmt ssr app reload: ' + appName);
+      log.cyan(`🔄 SSR handler reload — ${colors.magenta(appName)}`);
       // this.program.emit('reload_ssr_app', appName);
     }
 
     if (hasMiddleware) return;
 
-    this.app.use(`/_${appName}`, function (req, res, next) {
-      const callback = ssrMiddlewares.get(appName);
-      if (callback) {
-        return callback(req, res, next);
-      }
-      next();
-    })
+    this.app
+      .use(`/_${appName}`, (req, res, next) => {
+        const callback = ssrMiddlewares.get(appName);
+        if (callback) {
+          return callback(req, res, next);
+        }
+        next();
+      })
       .use(`/${appName}`, ssrProxy(appName));
   }
 
@@ -55,27 +73,25 @@ class Server {
       throw new Error('Gui port is not properly specified! Please specify in services.def');
     }
 
-    this.app.get('/__dmt__reload', (req, res) => {
-      const appDir = req.query.app;
-      if (fs.existsSync(appDir)) {
-        loadApps([{ appDir }]).then(appDefinations => {
-          for (const appName in appDefinations) {
-            const ssrHandler = appDefinations[appName]?.ssrHandler;
-            if (ssrHandler) {
-              this.useDynamicSSR(appName, ssrHandler, true);
-            }
-          }
-          res.end('success');
-        }).catch((err) => {
-          log.red(err.message || err);
-          res.end('rejected');
-        })
-      } else {
-        log.red("__dmt__reload appdir do not exist: " + appDir);
-        res.end('rejected');
-      }
+    this.app
+      .get('/__dmt__reload', (req, res) => {
+        const appDir = req.query.app;
 
-    })
+        if (fs.existsSync(appDir)) {
+          //log.red(`__dmt__reload called for app: ${appDir}`);
+          reloadSSRHandler({ server: this, appDir })
+            .then(() => {
+              res.end('success');
+            })
+            .catch(() => {
+              // will report error elsewhere
+              res.end('rejected');
+            });
+        } else {
+          log.red(`__dmt__reload appdir do not exist: ${appDir}`);
+          res.end('rejected');
+        }
+      })
       .listen(port, () => {
         //log.green('%s listening at http://%s:%s', description || 'Server', 'localhost', port);
 
